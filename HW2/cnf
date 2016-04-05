@@ -13,13 +13,13 @@ class Node(object):
 
 def and_handler(index, size, polish):
     left_child = impl_free(index + 1, size, polish)
-    right_child = impl_free(index + left_child[0] + 1, size, polish)
+    right_child = impl_free(left_child[0] + 1, size, polish)
     node = Node('&', left_child[1], right_child[1])
     return (right_child[0], node)
 
 def or_handler(index, size, polish):
     left_child = impl_free(index + 1, size, polish)
-    right_child = impl_free(index + left_child[0] + 1, size, polish)
+    right_child = impl_free(left_child[0] + 1, size, polish)
     node = Node('|', left_child[1], right_child[1])
     return (right_child[0], node)
 
@@ -30,21 +30,21 @@ def neg_handler(index, size, polish):
 
 def rarrow_handler(index, size, polish):
     left_child = impl_free(index + 1, size, polish)
-    right_child = impl_free(index + left_child[0] + 1, size, polish)
+    right_child = impl_free(left_child[0] + 1, size, polish)
     left_wrapper = Node('-', left_child[1])
     node = Node('|', left_wrapper, right_child[1])
     return (right_child[0], node)
 
 def larrow_handler(index, size, polish):
     left_child = impl_free(index + 1, size, polish)
-    right_child = impl_free(index + left_child[0] + 1, size, polish)
+    right_child = impl_free(left_child[0] + 1, size, polish)
     right_wrapper = Node('-', right_child[1])
     node = Node('|', left_child[1], right_wrapper)
     return (right_child[0], node)
 
 def lrarrow_handler(index, size, polish):
     left_child = impl_free(index + 1, size, polish)
-    right_child = impl_free(index + left_child[0] + 1, size, polish)
+    right_child = impl_free(left_child[0] + 1, size, polish)
     left_neg = Node('-', left_child[1])
     right_neg = Node('-', right_child[1])
     left_wrapper = Node('|', left_neg, right_child[1])
@@ -63,7 +63,7 @@ def map_operator():
 def impl_free(index, size, polish):
     if bool(re.match('[A-Za-z0-9]+', polish[index])):
         node = Node(polish[index])
-        return (node, index)
+        return (index, node)
     return handler[polish[index]](index, size, polish)
 
 def generate_nnf(head):
@@ -89,7 +89,7 @@ def generate_nnf(head):
         elif child.symbol == '-':
             node = generate_nnf(child.child1)
         else:
-            child_nnf = genertate_nnf(child)
+            child_nnf = generate_nnf(child)
             node = Node('-', child_nnf)
     else:
         node = Node(head.symbol)
@@ -124,11 +124,11 @@ def generate_cnf(head):
     return node
 
 def prefix_traverse(head):
-    print head.symbol
-    if symbol == '&' or symbol == '|':
+    print head.symbol,
+    if head.symbol == '&' or head.symbol == '|':
         prefix_traverse(head.child1)
         prefix_traverse(head.child2)
-    elif symbol == '-':
+    elif head.symbol == '-':
         prefix_traverse(head.child1)
 
 def infix_traverse(head):
@@ -138,7 +138,7 @@ def infix_traverse(head):
         result = result + '& '
         result = result + '( ' + infix_traverse(head.child2) + ') '
     elif head.symbol == '|':
-        result = infix_traverse(head.child1)
+        result = result + infix_traverse(head.child1)
         result = result + '| '
         result = result + infix_traverse(head.child2)
     elif head.symbol == '-':
@@ -148,15 +148,76 @@ def infix_traverse(head):
         result = head.symbol + ' '
     return result
 
+def cleanup_clauses(start, end, result):
+    depth = 0
+    start_point = 0
+    end_point = 0
+    clean_result = ''
+    if '&' not in result[start:end]:
+        return '( ' + result[start:end] + ' )'
+    for i in range(start, end):
+        if result[i] == '(':
+            if depth == 0:
+                start_point = i + 2
+            depth += 1
+        elif result [i] == ')':
+            depth -= 1
+            if depth == 0:
+                end_point = i - 1
+                clean_result = clean_result \
+                        + cleanup_clauses(start_point, end_point, result)
+        else:
+            if depth == 0:
+                clean_result = clean_result + result[i]
+    return clean_result
+
+def validity_check(result):
+    conjuncted_result = result.split(' & ')
+    for conjuncted in conjuncted_result:
+        conjuncted = conjuncted[2:-2]
+        disjuncted_result = conjuncted.split(' | ')
+        validity = False
+        validity_dictionary = {}
+        for disjuncted in disjuncted_result:
+            if disjuncted[0] == '-':
+                if validity_dictionary.get(disjuncted[2:]) == 1:
+                    validity = True
+                    break
+                validity_dictionary[disjuncted[2:]] = -1
+            else:
+                if validity_dictionary.get(disjuncted) == -1:
+                    validity = True
+                    break
+                validity_dictionary[disjuncted] = 1
+        if not validity:
+            return False
+    return True
+
 def main():
     polish_notation = copy.deepcopy(sys.argv[1:])
     n = len(polish_notation)
     map_operator()
     size, root = impl_free(0, n, polish_notation)
+    # print "impl_free finished."
+    # prefix_traverse(root)
+    # print ''
     nnf_root = generate_nnf(root)
+    # print "nnf-ize finished."
+    # prefix_traverse(nnf_root)
+    # print ''
     cnf_root = generate_cnf(nnf_root)
+    # print "cnf-ize finished."
     prefix_traverse(cnf_root)
+    print ''
     result = infix_traverse(cnf_root)
+    # print result
+    result = cleanup_clauses(0, len(result), result)
+    print result
+    is_valid = validity_check(result)
+    if is_valid:
+        print 'Valid'
+    else:
+        print 'Not Valid'
 
 if __name__ == '__main__':
     main()
