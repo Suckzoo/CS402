@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import sys
 import copy
 import re
@@ -68,13 +69,13 @@ def impl_free(index, size, polish):
 def generate_nnf(head):
     node = None
     if head.symbol == '&':
-        left_cnf = generate_nnf(head.child1)
-        right_cnf = generate_nnf(head.child2)
-        node = Node('&', left_cnf, right_cnf)
+        left_nnf = generate_nnf(head.child1)
+        right_nnf = generate_nnf(head.child2)
+        node = Node('&', left_nnf, right_nnf)
     elif head.symbol == '|':
-        left_cnf = generate_nnf(head.child1)
-        right_cnf = generate_nnf(head.child2)
-        node = Node('|', left_cnf, right_cnf)
+        left_nnf = generate_nnf(head.child1)
+        right_nnf = generate_nnf(head.child2)
+        node = Node('|', left_nnf, right_nnf)
     elif head.symbol == '-':
         child = head.child1
         if child.symbol == '&':
@@ -94,18 +95,69 @@ def generate_nnf(head):
         node = Node(head.symbol)
     return node
 
+def distr_func(left_child, right_child):
+    node = None
+    if left_child.symbol == '&':
+        exp1 = distr_func(left_child.child1, right_child)
+        exp2 = distr_func(left_child.child2, right_child)
+        node = Node('&', exp1, exp2)
+    elif right_child.symbol == '&':
+        exp1 = distr_func(left_child, right_child.child1)
+        exp2 = distr_func(left_child, right_child.child2)
+        node = Node('&', exp1, exp2)
+    else:
+        node = Node('|', left_child, right_child)
+    return node
+
 def generate_cnf(head):
-    pass
+    node = None
+    if head.symbol == '&':
+        left_cnf = generate_cnf(head.child1)
+        right_cnf = generate_cnf(head.child2)
+        node = Node('&', left_cnf, right_cnf)
+    elif head.symbol == '|':
+        left_cnf = generate_cnf(head.child1)
+        right_cnf = generate_cnf(head.child2)
+        node = distr_func(left_cnf, right_cnf)
+    else:
+        node = head
+    return node
+
+def prefix_traverse(head):
+    print head.symbol
+    if symbol == '&' or symbol == '|':
+        prefix_traverse(head.child1)
+        prefix_traverse(head.child2)
+    elif symbol == '-':
+        prefix_traverse(head.child1)
+
+def infix_traverse(head):
+    result = ''
+    if head.symbol == '&':
+        result = '( ' + infix_traverse(head.child1) + ') '
+        result = result + '& '
+        result = result + '( ' + infix_traverse(head.child2) + ') '
+    elif head.symbol == '|':
+        result = infix_traverse(head.child1)
+        result = result + '| '
+        result = result + infix_traverse(head.child2)
+    elif head.symbol == '-':
+        result = '- '
+        result = result + infix_traverse(head.child1)
+    else:
+        result = head.symbol + ' '
+    return result
 
 def main():
-    n = sys.argc
-    polish_notation = copy.deepcopy(sys.argv)
+    polish_notation = copy.deepcopy(sys.argv[1:])
+    n = len(polish_notation)
     map_operator()
     size, root = impl_free(0, n, polish_notation)
     nnf_root = generate_nnf(root)
     cnf_root = generate_cnf(nnf_root)
+    prefix_traverse(cnf_root)
+    result = infix_traverse(cnf_root)
 
 if __name__ == '__main__':
     main()
-
 
