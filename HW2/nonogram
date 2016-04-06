@@ -1,4 +1,6 @@
 #!/usr/bin/python
+from subprocess import call
+import copy
 
 rule_row = []
 rule_col = []
@@ -7,27 +9,197 @@ class Instance(object):
     def __init__(self, rows, cols):
         self.rows = rows
         self.cols = cols
-        self.num_literal = 0
+        self.num_literal = 1
         self.literal = {}
+        self.idmap = {}
+        self.rules = []
         for i in range(rows):
             for j in range(cols):
-                l_name = 'cell(' + str(i) + ',' + str(j) + ')'
+                l_name = 'cell(%d,%d)' % (i, j)
                 self.literal[l_name] = self.num_literal
+                self.idmap[self.num_literal] = l_name
                 self.num_literal += 1
 
+    def push_rule(self, rule):
+        self.rules.append(rule)
+
+    def push_rule_name(self, rule_name):
+        self.literal[rule_name] = self.num_literal
+        self.idmap[self.num_literal] = rule_name
+        self.num_literal += 1
+
+    def get_num_literal(self):
+        return self.num_literal - 1
+
+    def get_num_clause(self):
+        return len(self.rules)
+
+    def next_cnf(self):
+        for rule in self.rules:
+            rule_to_change = copy.deepcopy(rule)
+            for i in range(len(rule_to_change)):
+                if rule_to_change[i][0:4] == 'neg/':
+                    rule_to_change[i] = -self.literal[rule_to_change[i][4:]]
+                else:
+                    rule_to_change[i] = self.literal[rule_to_change[i]]
+            yield rule_to_change
+
+def get_cell_literal(row, col):
+    return 'cell(%d,%d)' % (row, col)
+
+instance = None
+
+def happen(achievement):
+    global instance
+    instance.push_rule(achievement)
+
+def unique(achievement):
+    global instance
+    for rule_original in achievement:
+        for rule_target in achievement:
+            if rule_original == rule_target:
+                continue
+            reject_other = ['neg/' + rule_original, 'neg/' + rule_target]
+            instance.push_rule(reject_other)
+
+def apply_row_rule(rule, index):
+    global instance
+    common_prefix = 'row_%d#' % index
+    r_sum = 0
+    l_sum = 0
+    rule_cnt = 0
+    acceptable_rules = []
+    map(lambda x: acceptable_rules.append([]), range(instance.cols))
+    for i, _rule in enumerate(rule[1:]):
+        r_sum += 1 + _rule
+    for i in range(len(rule)):
+        achievement = []
+        for j in range(instance.cols - r_sum - l_sum - rule[i] + 1):
+            rule_name = common_prefix + str(rule_cnt)
+            achievement.append(rule_name)
+            instance.push_rule_name(rule_name)
+            for k in range(l_sum + j, l_sum + j + rule[i]):
+                _accept = ['neg/' + rule_name, get_cell_literal(index, k)]
+                instance.push_rule(_accept)
+                acceptable_rules[k].append(rule_name)
+            if l_sum + j - 1 >= 0:
+                _reject = ['neg/' + rule_name, \
+                        'neg/' + get_cell_literal(index, l_sum + j - 1)]
+                instance.push_rule(_reject)
+            if l_sum + j + rule[i] < instance.cols:
+                _reject = ['neg/' + rule_name, \
+                        'neg/' + get_cell_literal(index, l_sum + j + rule[i])]
+                instance.push_rule(_reject)
+            rule_cnt += 1
+        happen(achievement)
+        unique(achievement)
+        l_sum += (rule[i] + 1)
+        if r_sum != 0:
+            r_sum -= (rule[i+1] + 1)
+    for i in range(instance.cols):
+        if len(acceptable_rules[i]) == rule_cnt and rule_cnt != 0:
+            instance.push_rule([get_cell_literal(index, i)])
+        elif len(acceptable_rules[i]) == 0:
+            instance.push_rule(['neg/' + get_cell_literal(index, i)])
+        else:
+            acceptable_rules[i].insert(0, 'neg/' + get_cell_literal(index, i))
+            instance.push_rule(acceptable_rules[i])
+        
+def apply_col_rule(rule, index):
+    global instance
+    common_prefix = 'col_%d#' % index
+    r_sum = 0
+    l_sum = 0
+    rule_cnt = 0
+    acceptable_rules = []
+    map(lambda x: acceptable_rules.append([]), range(instance.cols))
+    for i, _rule in enumerate(rule[1:]):
+        r_sum += 1 + _rule
+    for i in range(len(rule)):
+        achievement = []
+        for j in range(instance.rows - r_sum - l_sum - rule[i] + 1):
+            rule_name = common_prefix + str(rule_cnt)
+            achievement.append(rule_name)
+            instance.push_rule_name(rule_name)
+            for k in range(l_sum + j, l_sum + j + rule[i]):
+                _accept = ['neg/' + rule_name, get_cell_literal(k, index)]
+                instance.push_rule(_accept)
+                acceptable_rules[k].append(rule_name)
+            if l_sum + j - 1 >= 0:
+                _reject = ['neg/' + rule_name, \
+                        'neg/' + get_cell_literal(l_sum + j - 1, index)]
+                instance.push_rule(_reject)
+            if l_sum + j + rule[i] < instance.rows:
+                _reject = ['neg/' + rule_name, \
+                        'neg/' + get_cell_literal(l_sum + j + rule[i], index)]
+                instance.push_rule(_reject)
+            rule_cnt += 1
+        happen(achievement)
+        unique(achievement)
+        l_sum += (rule[i] + 1)
+        if r_sum != 0:
+            r_sum -= (rule[i+1] + 1)
+    for i in range(instance.rows):
+        if len(acceptable_rules[i]) == rule_cnt and rule_cnt != 0:
+            instance.push_rule([get_cell_literal(i, index)])
+        elif len(acceptable_rules[i]) == 0:
+            instance.push_rule(['neg/' + get_cell_literal(i, index)])
+        else:
+            acceptable_rules[i].insert(0, 'neg/'+get_cell_literal(i, index))
+            instance.push_rule(acceptable_rules[i])
+
+def export_rules():
+    global instance
+    with open('rule', 'w') as f:
+        f.write('p cnf %d %d\n' % (instance.get_num_literal(),\
+                                instance.get_num_clause()))
+        for clause in instance.next_cnf():
+            for literal in clause:
+                f.write(str(literal) + ' ')
+            f.write('0\n')
+
+def run_sat_solver():
+    call(['minisat', 'rule', 'solution'])
+
+def print_result():
+    with open('solution') as f:
+        satisfiability = f.readline().strip()
+        if satisfiability == 'SAT':
+            print 'Satisfiable!'
+            assign_map = map(lambda x: int(x), f.readline().strip().split())
+            print assign_map
+            for i in range(instance.rows):
+                for j in range(instance.cols):
+                    index = i*instance.rows + j
+                    if assign_map[index] < 0:
+                        print '.',
+                    else:
+                        print '#',
+                print ''
+
 def main():
+    global instance
     with open('cwd') as f:
         n = int(f.readline().strip())
         m = int(f.readline().strip())
+        instance = Instance(n, m)
         for i in range(n):
             rule_row.append(f.readline())
             rule_row[i] = map(lambda x: int(x), rule_row[i].strip().split())
         for i in range(m):
             rule_col.append(f.readline())
             rule_col[i] = map(lambda x: int(x), rule_col[i].strip().split())
-        print rule_row
-        print rule_col
+    
+    for i, rule in enumerate(rule_row):
+        apply_row_rule(rule, i)
 
+    for i, rule in enumerate(rule_col):
+        apply_col_rule(rule, i)
+
+    export_rules()
+    run_sat_solver()
+    print_result()
 
 if __name__=='__main__':
     main()
+
