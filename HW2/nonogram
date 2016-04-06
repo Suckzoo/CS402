@@ -1,0 +1,33 @@
+#!/usr/bin/python
+
+rule_row = []
+rule_col = []
+
+class Instance(object):
+    def __init__(self, rows, cols):
+        self.rows = rows
+        self.cols = cols
+        self.num_literal = 0
+        self.literal = {}
+        for i in range(rows):
+            for j in range(cols):
+                l_name = 'cell(' + str(i) + ',' + str(j) + ')'
+                self.literal[l_name] = self.num_literal
+                self.num_literal += 1
+
+def main():
+    with open('cwd') as f:
+        n = int(f.readline().strip())
+        m = int(f.readline().strip())
+        for i in range(n):
+            rule_row.append(f.readline())
+            rule_row[i] = map(lambda x: int(x), rule_row[i].strip().split())
+        for i in range(m):
+            rule_col.append(f.readline())
+            rule_col[i] = map(lambda x: int(x), rule_col[i].strip().split())
+        print rule_row
+        print rule_col
+
+
+if __name__=='__main__':
+    main()
