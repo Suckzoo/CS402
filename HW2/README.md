@@ -22,6 +22,7 @@
 
 ### 실행 방법
 ```shell
+chmod +x cnf
 ./cnf [formula]
 ```
 \[formula\] 입력시 원래 <, >는 redirection, |는 pipe, &는 background execute의 
@@ -80,6 +81,7 @@
 1. cwd 파일을 작성합니다.
 2. 다음 command를 통해 실행합니다.
 ```shell
+chmod +x nonogram
 ./nonogram
 ```
 
