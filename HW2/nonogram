@@ -167,7 +167,6 @@ def print_result():
         if satisfiability == 'SAT':
             print 'Satisfiable!'
             assign_map = map(lambda x: int(x), f.readline().strip().split())
-            print assign_map
             for i in range(instance.rows):
                 for j in range(instance.cols):
                     index = i*instance.rows + j
@@ -176,6 +175,8 @@ def print_result():
                     else:
                         print '#',
                 print ''
+        else:
+            print 'No answer exists!'
 
 def main():
     global instance
