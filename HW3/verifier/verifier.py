@@ -23,6 +23,7 @@ class Pattern:
     ptn_testme = re.compile('public void testMe\(int(, int)*\)')
     ptn_goto = re.compile('^goto .*')
     ptn_expression = re.compile('[\$A-Za-z0-9]+ = .*')
+    ptn_param = re.compile('@parameter[0-9]+: int;')
 
 class ShimpleInstance(object):
 
@@ -30,6 +31,7 @@ class ShimpleInstance(object):
         self.path = path
         self.generate_shimple()
         self.variables = {}
+        self.params = []
         self.labels = {}
         self.flow_graph = {}
         self.validity = True
@@ -47,6 +49,9 @@ class ShimpleInstance(object):
         os.remove('./%s.java' % self.file_name)
         os.remove('./%s.class' % self.file_name)
         os.remove('./%s.shimple' % self.file_name)
+
+    def declare_param(self, x):
+        self.params.append(x)
 
     def declare_token(self, x):
         self.variables[x] = Int(x)
@@ -77,11 +82,17 @@ class ShimpleInstance(object):
                     tokens = line[5:-1].split(', ')
                 for x in tokens:
                     self.declare_token(x)
+            elif Pattern.ptn_param.search(line):
+                self.declare_param(line.split(':=')[0].strip())
             elif Pattern.ptn_expression.search(line):
                 self.add_expression(line.replace('=', '==')[:-1])
             elif Pattern.ptn_throw.search(line):
                 if self.solver.check() == sat:
-                    raise InvalidException(self.solver.model())
+                    model = self.solver.model()
+                    t_model = []
+                    for param in self.params:
+                        t_model.append(model.evaluate(self.variables[param]))
+                    raise InvalidException(t_model)
             for edge in node.edge:
                 if edge[0]:
                     self.solver.push()
