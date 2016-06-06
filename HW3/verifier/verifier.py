@@ -41,7 +41,8 @@ class ShimpleInstance(object):
         if self.path.find('.java') == -1:
             raise
         self.file_name = self.path.split('/')[-1].split('.java')[0]
-        shutil.copyfile(self.path, self.file_name + '.java')
+        shutil.copyfile(self.path, 'soot/' + self.file_name + '.java')
+        os.chdir('soot/')
         os.system('javac ' + self.file_name + '.java')
         os.system('./soot.sh ' + self.file_name)
 
@@ -110,6 +111,7 @@ class ShimpleInstance(object):
                     for param in self.params:
                         t_model.append(model.evaluate(self.variables[param]))
                     # print model
+                    self.cleanup_shimple()
                     raise InvalidException(t_model)
             elif phi and not next_phi:
                 next_phi = phi
@@ -179,7 +181,7 @@ def main():
     instance = ShimpleInstance(sys.argv[1])
     instance.scan()
     instance.interpret()
-    # instnace.cleanup_shimple()
+    instance.cleanup_shimple()
 
 if __name__ == '__main__':
     try:
@@ -190,6 +192,6 @@ if __name__ == '__main__':
     except InvalidException as e:
         print 'INVALID'
         print e.msg
-    # except:
-    #     print 'Usage: python verifier.py <file_name>.java'
+    except:
+        print 'Usage: python verifier.py <file_name>.java'
 
