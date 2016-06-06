@@ -1,0 +1,6 @@
+z3/**
+z3env/**
+*.java
+*.class
+*.shimple
+soot*
